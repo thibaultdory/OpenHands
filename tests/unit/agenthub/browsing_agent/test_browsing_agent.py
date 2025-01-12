@@ -1,10 +1,8 @@
 from unittest.mock import MagicMock
 
 from openhands.agenthub.browsing_agent.browsing_agent import (
-    BrowsingAgent,
     has_modal_dialog,
 )
-from openhands.core.config import AgentConfig
 
 
 def test_has_modal_dialog():
@@ -33,11 +31,11 @@ def test_browsing_agent_modal_dialog_handling():
         'choices': [{'message': {'content': 'click("489")'}}]
     }
 
-    # Create a BrowsingAgent instance
-    agent = BrowsingAgent(mock_llm, AgentConfig())
-
     # Import the module-level functions
-    from openhands.agenthub.browsing_agent.browsing_agent import get_system_message, get_prompt
+    from openhands.agenthub.browsing_agent.browsing_agent import (
+        get_prompt,
+        get_system_message,
+    )
 
     # Verify that the system message includes modal dialog handling instructions
     system_msg = get_system_message('test goal', 'test action space')
