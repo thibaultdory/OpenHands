@@ -40,12 +40,22 @@ def get_error_prefix(last_browser_action: str) -> str:
     return f'IMPORTANT! Last action is incorrect:\n{last_browser_action}\nThink again with the current observation of the page.\n'
 
 
+def has_modal_dialog(axtree_txt: str) -> bool:
+    """Check if the accessibility tree contains a modal dialog (e.g., cookie banner)."""
+    return 'dialog' in axtree_txt and 'modal=True' in axtree_txt
+
+
 def get_system_message(goal: str, action_space: str) -> str:
     return f"""\
 # Instructions
 Review the current state of the page and all other information to find the best
 possible next action to accomplish your goal. Your answer will be interpreted
 and executed by a program, make sure to follow the formatting instructions.
+
+IMPORTANT: If you see a modal dialog (e.g., cookie banner) in the accessibility tree,
+you MUST handle it first before attempting any other actions. Look for buttons with
+text like "Accept", "Accept All", "Continue", etc. in any language. These buttons
+might be marked as hidden=True but should still be clickable.
 
 # Goal:
 {goal}
@@ -80,10 +90,20 @@ def get_prompt(
 # Previous Actions
 {prev_action_str}
 
-Here is an example with chain of thought of a valid action when clicking on a button:
+Here are examples with chain of thought of valid actions:
+
+Example 1 - Clicking a button:
 "
 In order to accomplish my goal I need to click on the button with bid 12
 ```click("12")```
+"
+
+Example 2 - Handling a cookie banner:
+"
+I notice there's a modal dialog for cookie consent that needs to be handled first.
+Looking at the accessibility tree, I can see a button with text 'Accept All' and bid 489.
+I should click this button before proceeding with any other actions.
+```click("489")```
 "
 """.strip()
     if USE_CONCISE_ANSWER:
@@ -193,8 +213,14 @@ class BrowsingAgent(Agent):
                     last_obs.axtree_object,
                     extra_properties=last_obs.extra_element_properties,
                     with_clickable=True,
-                    filter_visible_only=True,
+                    filter_visible_only=False,  # Don't filter visible only to handle hidden cookie banners
                 )
+                # If there's a modal dialog, add a note to the accessibility tree
+                if has_modal_dialog(cur_axtree_txt):
+                    cur_axtree_txt = (
+                        'IMPORTANT: This page has a modal dialog that must be handled first!\n\n'
+                        + cur_axtree_txt
+                    )
             except Exception as e:
                 logger.error(
                     'Error when trying to process the accessibility tree: %s', e
